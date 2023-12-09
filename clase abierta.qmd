@@ -1,0 +1,313 @@
+---
+title: "Intro a R aplicado al análisis de los datos abiertos de las Elecciones Generales 2023"
+author: "Pedro Damián Orden"
+format: html
+editor: visual
+---
+
+## Una muy breve intro al paradigma tidy y tidyverse (+ una pizca de datatable) en el análisis de datos electorales
+
+### Paradigma tidy
+
+El paradigma tidy es un enfoque para organizar y estructurar los datos de una manera consistente, lo que facilita su manipulación y análisis.
+
+El paradigma tidy se basa en dos principios fundamentales:
+
+1\. **Cada variable se encuentra en una columna:** En un conjunto de datos tidy, cada variable ocupa su propia columna. Esto permite una representación clara y uniforme de las diferentes variables que se están analizando.
+
+2\. **Cada observación se encuentra en una fila:** Cada fila de datos corresponde a una observación individual. Siguiendo este principio, es más sencillo realizar análisis y operaciones sobre las observaciones de manera coherente.
+
+3\. **Un n valor ocupa una celda:** En un conjunto de datos tidy, cada celda contiene un único valor. Esto facilita el procesamiento y manipulación de los datos, ya que evita ambigüedades y confusiones.
+
+El siguiente esquema da cuenta de lo planteado
+
+![](https://garrettgman.github.io/images/tidy-4.png)
+
+### Paquetes y Tidyverse
+
+En R, un paquete (o librería) es una colección de funciones, conjuntos de datos y documentación empaquetados juntos. Los paquetes permiten extender la funcionalidad de R más allá de las funciones y características básicas que vienen con la instalación estándar.\
+[Tidyverse](https://www.tidyverse.org/) es un conjunto de paquetes de software en R que implementan el paradigma tidy. Es un aliado en el la tarea de limpiar y transformar datos.
+
+En particular, el paquete **dplyr** dentro de tidyverse es especialmente útil para el análisis de datos de encuestas. Proporciona un conjunto de verbos que permiten realizar operaciones comunes de manipulación de datos, como **filtrar**, **seleccionar**, **transformar**, **resumir** los datos. Estas operaciones se aplican de forma intuitiva y eficiente, lo que facilita la exploración y el análisis de los datos de la encuesta.
+
+Usar tidyverse para analizar datos de opinión pública o electorales ofrece varias ventajas. En primer lugar, el enfoque tidy ayuda a estructurar los datos de manera consistente, lo que facilita su comprensión y evita confusiones durante el análisis. Además, la sintaxis coherente y legible de dplyr simplifica el código y mejora la reproducibilidad de los análisis.
+
+El operador fundamental de la librería tidyverse se llama **pipe** y se escribe así **%\>%** o bien **\|\>**
+
+```{r}
+#%>% 
+#%>% 
+#|>
+```
+
+Otra ventaja es que tidyverse incluye paquetes adicionales como **ggplot2**, que facilita la creación de gráficos y visualizaciones atractivas y personalizadas. Esto es especialmente útil para presentar los resultados de la encuesta de manera clara y efectiva.
+
+#### Datos electorales
+
+Hagamos una primera bajada del paradigma tidy aplicada a datos del recuento provisional de las Elecciones Generales 2023.
+
+Para consultar los datos debemos acceder al portal del Estado Nacional donde se encuentra publicado el recuento provisorio: <https://www.argentina.gob.ar/dine/resultados-electorales/elecciones-2023>. Aquí encontraremos los resultados oficiales de las elecciones para todo el país. Para este ejemplo el archivo ya fue descargado y se llama "ResultadosElectorales".
+
+Supongamos que queremos sabes cuál es el N de los votos que obtuvieron las distintas fuerzas por escuela en las elecciones GENERALES 2023 para la categoría Gobernador, en el Municipio de General Pueyrredón, Provincia de Buenos Aires, correspondiente a la quinta sección electoral.
+
+**Extracción de datos**
+
+Recuperaremos los datos de acuerdo a sus características (grandes volúmenes de datos)
+
+#### Procesamiento multiparalelo con datable
+
+![](https://panamahitek.com/wp-content/uploads/2017/12/procesamiento_serie_paralelo.jpg){fig-align="center"}
+
+Para poder recuperar la data de las elecciones en nuestras compus vamos a utilizar un método que se llama procesamiento paralelo, y lo que hace en definitiva es distribuir el peso del procesamiento del csv en los núcleos de nuestra pc, por ejemplo si tenemos una i5 podemos usar 5 núcleos de nuestro [procesador](https://www.xataka.com/basics/cpu-que-como-sirve).
+
+Para esto vamos a descargar un paquete (hay varios que nos permiten hacer lo mismo), que se llama [datatable](https://rdatatable.gitlab.io/data.table/) y llamar una función que se llama **fread** (ya viene tidyverse) .
+
+```{r}
+
+#install.packages("data.table") #instalamos la librearía
+
+library(data.table)#levantamos
+
+num_cores <- parallel::detectCores()
+
+```
+
+```{r}
+
+
+# URL del archivo ZIP
+url <- "https://www.argentina.gob.ar/sites/default/files/2023_generales.zip"
+
+# Ruta local donde se guardará el archivo ZIP
+zip_filepath <- "2023_generales.zip"
+
+# Descargar el archivo ZIP
+download.file(url, zip_filepath)
+
+# Descomprimir el archivo ZIP
+unzip(zip_filepath, exdir = "elecciones")
+
+# Leer el archivo CSV usando fread
+csv_filepath <- "elecciones/2023_Generales/ResultadosElectorales_2023.csv"
+
+data <- fread(csv_filepath, nThread = num_cores)
+
+# Ver las primeras filas del DataFrame
+head(data)
+
+```
+
+![](https://gifdb.com/images/high/dr-strange-playing-with-inscription-hkimfnd4tf3lefgo.gif)
+
+```{r}
+# Eliminar el archivo ZIP
+file_removed_status <- file.remove(zip_filepath)
+
+# Verificar si el archivo se eliminó correctamente
+if (file_removed_status) {
+  print("El archivo ZIP ha sido eliminado con éxito.")
+} else {
+  print("No se pudo eliminar el archivo ZIP.")
+}
+
+```
+
+protip adquirido
+
+#### Exploramos nuestro dataframe
+
+```{r}
+str(data)
+
+#unique(ba_tercera$Agrupacion)
+```
+
+que vemos?
+
+#### **Transformación de los datos**
+
+Ahora que verificamos que la data está ok, apliquemos algunas funciones de **tidyverse** a nuestros datos para ver cómo funciona la lógica tidyverse aplicada a nuestro objetivo: filtrar los datos en General Pueyrredón, para la categoría gobernador, seleccionar las variables que nos aportan la información, transformar los datos que hagan falta y generar un resumen que nos indique el N del voto por escuela y fuerza.
+
+#### **Filtrado**
+
+Utilizamos la función filter para filtrar los datos que nos interesan.
+
+```{r}
+#install.packages("tidyverse")
+library(tidyverse)
+
+#exploramos sin crear un objeto
+datagp<-data %>% #operador pipe, encadena operaciones
+# Filtramos solamente las filas donde el valor de la columna "seccion" es "gp".
+  filter(seccion_nombre == "General Pueyrredón") 
+```
+
+Que categorías hay?
+
+```{r}
+datagp %>% 
+  group_by(cargo_nombre) %>% 
+  count()
+```
+
+Guardamos en un objeto los datos correspondientes a MDP, para la categoría gobernador y vice.
+
+```{r}
+
+gobernador_gp <-datagp %>% #operador pipe, encadena operaciones
+  filter(cargo_nombre=="GOBERNADOR Y VICE") #agregamos otra accion
+
+```
+
+#### **Selección**
+
+Con el select generamos una selección de variables que nos pueden ser útiles, por ejemplo las listas y la cantidad de votos:
+
+```{r}
+gob_select <- gobernador_gp %>% 
+  select(circuito_id, mesa_id,agrupacion_nombre, votos_cantidad, votos_tipo)
+
+head(gob_select)
+```
+
+#### **Transformación**
+
+En nuestro dataframe tenemos un campo vacío que se corresponde con los votos positivos y el resto de categorías a blancos, etc. Transformemos ese campo libre en una nueva categoría sea "otro".
+
+Para eso vamos a usar dos funciones muy importantes en R: mutate y casewhen.
+
+Mutate permite crear o modificar columnas en un data frame de forma rápida y sencilla. Esta función toma como argumento un data frame y una o más expresiones que especifican cómo se deben calcular los valores de las nuevas columnas.
+
+Mientras que con case_when realizamos transformaciones condicionales en los datos. Permite especificar múltiples condiciones y sus correspondientes acciones a realizar, en este caso la usaremos para recategorizar datos vacíos.
+
+```{r}
+
+gob_select <- gob_select %>%
+  mutate(Agrupacion_ok = case_when(
+    agrupacion_nombre == "" ~ "otro",  # Si el valor de Agrupacion es vacío, se asigna "otro"
+    TRUE ~ agrupacion_nombre  # Si no es vacío, se mantiene el valor original de Agrupacion
+  ))
+
+
+
+```
+
+#### **Resumen**
+
+Para llegar el n de votos por fuerza precisamos una función de resumen, en tidyverse dicha operación se realiza con el código summarise. Su propósito principal es calcular estadísticas resumidas o realizar operaciones de agregación en los datos. El resultado es una tabla de resumen.
+
+Algunos ejemplos comunes de lo que se puede hacer con **`summarise()`** son:
+
+1.  Calcular la suma total de una variable numérica.
+
+2.  Calcular el promedio de una variable numérica.
+
+3.  Calcular el valor máximo y mínimo de una variable numérica.
+
+4.  Contar la cantidad de observaciones en un grupo.
+
+5.  Realizar cálculos personalizados utilizando funciones definidas por el usuario.
+
+Veamos cómo opera en la práctica generando una primera síntesis de cantidad de votos emitidos en General Pueyrredón:
+
+```{r}
+votos_total<-gob_select %>%
+  summarise(n_seleccion=sum(votos_cantidad))
+
+votos_total
+```
+
+cuantos votos fueron positivos?
+
+```{r}
+votos_positivos <- gob_select %>%
+  filter(votos_tipo=="POSITIVO") %>% 
+  summarise(n_total=sum(votos_cantidad))
+
+votos_positivos
+```
+
+Cuantos votos no fueron positivos?
+
+```{r}
+votos_total-votos_positivos #calculadora
+```
+
+Votos por fuerza política (resumen agrupado):
+
+```{r}
+
+# Se crea un nuevo objeto llamado "votosxagrup" para almacenar los resultados del análisis de votos por agrupación en el partido de gp.
+
+votosxagrup <- gob_select %>%
+  group_by(Agrupacion_ok) %>% # La función group_by() se utiliza para agrupar los datos por la variable "Agrupacion". Esto permitirá realizar cálculos separados para cada agrupación.
+  summarise(n=sum(votos_cantidad)) %>% # La función summarise() se utiliza para calcular la suma de los votos para cada agrupación. El resultado se guarda en una nueva columna llamada "n_votos".
+  arrange(desc(n))# El código concluye mostrando el objeto "votosxagrup", que contiene la tabla resultante con las agrupaciones y la suma de votos para cada una.
+print(votosxagrup)
+
+```
+
+#### Porcentajes
+
+Veamos una transformación importante relacionado a la generación de estadísticas descriptivas.
+
+```{r}
+gp_agrupaciones <- gob_select %>%
+  group_by(Agrupacion_ok) %>% 
+  
+  # Calcula la suma de los votos para cada agrupación.
+  summarise(votos_agrupacion = sum(votos_cantidad)) %>% 
+  
+  # Calcula el total de votos sumando los votos de todas las agrupaciones.
+  mutate(totales = sum(votos_agrupacion),
+         
+         # Calcula el porcentaje de votos de cada agrupación en relación al total de votos.
+         porc_agrupacion = round(100 * votos_agrupacion / totales, 1))
+
+# Imprime los resultados de los votos por agrupación y los porcentajes correspondientes.
+gp_agrupaciones
+
+```
+
+#### Primeras visualizaciones
+
+El paquete [**`squisse`**](https://dreamrs.github.io/esquisse/) de R es una herramienta que se utiliza para el análisis y la visualización de datos de encuestas.
+
+```{r}
+#install.packages("esquisse")
+
+#esquisse::esquisser(gp_agrupaciones)
+
+```
+
+Esquisse nos genera un código en ggplot, una librería de R para visualizar datos.
+
+```{r}
+ggplot(gp_agrupaciones) +
+  aes(x = Agrupacion_ok, y = porc_agrupacion) +
+  geom_col(fill = "orange") +
+  coord_flip() +
+  theme_classic()
+```
+
+La visualización de datos es esencial para comprender la complejidad de los conjuntos de datos electorales. En el gráfico de barras que hemos creado, cada barra representa una agrupación política y su altura corresponde al porcentaje de votos que recibió esa agrupación. Este tipo de gráfico es particularmente útil para identificar rápidamente qué agrupaciones tuvieron un mejor desempeño en las elecciones.
+
+### **Conclusión y Pasos Siguientes**
+
+#### Ideas Principales
+
+1.  **Uso de R y Tidyverse**: Hemos visto cómo R y el conjunto de paquetes de Tidyverse pueden simplificar significativamente el análisis de datos electorales.
+
+2.  **Estructura de los Datos**: La estructura "tidy" de los datos facilita la manipulación y el análisis, permitiendo filtrar, transformar y resumir los datos de manera eficiente.
+
+3.  **Insights Electorales**: A través del análisis y la visualización de los datos, pudimos obtener una visión clara de la distribución de votos entre diferentes agrupaciones políticas.
+
+#### Pasos Siguientes
+
+1.  **Análisis Temporal**: Sería interesante extender este análisis para incluir datos de elecciones anteriores y examinar cómo han cambiado las tendencias políticas a lo largo del tiempo.
+
+2.  **Predicciones y Modelos**: podríamos usar estos datos para entrenar modelos predictivos que podrían ser útiles para anticipar los resultados de futuras elecciones.
+
+Con estos pasos, no solo tendríamos un análisis completo del pasado y el presente electoral, sino también herramientas para explorar posibles futuros escenarios. Este enfoque holístico hace que el análisis de datos electorales sea una herramienta poderosa para cualquier persona interesada en la dinámica política.
+
+Gracias por el tiempo!
